@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "detect freq"
+include(":harptune-core") // En lugar de :detectfreq
 include(":app")
  
