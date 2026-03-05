@@ -6,9 +6,8 @@ project("harptune-native")
 # Oboe usa su propio nombre de paquete
 find_package(oboe REQUIRED CONFIG)
 
-# TensorFlow Lite Prefab usualmente exporta como 'tensorflowlite' o 'tensorflow-lite'
-# Intentamos primero con 'tensorflowlite' que es el estándar moderno
-find_package(tensorflowlite REQUIRED CONFIG)
+# La dependencia de TensorFlow Lite queda estrictamente deshabilitada
+# hasta la fase de Inferencia en el Borde (Edge AI).
 
 # 2. Definición de la librería nativa
 add_library(harptune-native SHARED
@@ -16,7 +15,7 @@ add_library(harptune-native SHARED
         AudioEngine.cpp
         FastYin.cpp)
 
-# 3. Configuración de estándares y optimizaciones
+# 3. Configuración de estándares y optimizaciones (Estado del Arte)
 target_compile_features(harptune-native PRIVATE cxx_std_20)
 
 target_compile_options(harptune-native PRIVATE
@@ -33,6 +32,5 @@ find_library(android-lib android)
 # 5. Enlace de targets
 target_link_libraries(harptune-native
         oboe::oboe
-        tensorflow::tensorflowlite
         ${log-lib}
         ${android-lib})
