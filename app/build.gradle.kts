@@ -1,28 +1,39 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
+    /**
+     * Namespace: Identificador para clases R y generación de código interno.
+     * Se mantiene com.rosso.harptune para evitar refactorización del código fuente.
+     */
     namespace = "com.rosso.harptune"
     compileSdk = 35
 
     defaultConfig {
+        /**
+         * ApplicationId: Identificador único de la aplicación en Google Play Console.
+         * Configurado según el identificador de la aplicación de frecuencia (detectfreq).
+         */
         applicationId = "com.rosso.detectfreq"
+
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.4-PRO"
+
+        // Versión incremental para control de despliegue en Play Store
+        versionCode = 5
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         externalNativeBuild {
             cmake {
-                cppFlags("-O3 -fvisibility=hidden")
-                abiFilters("armeabi-v7a", "arm64-v8a", "x86_64")
+                // Optimización crítica: C++23 y vectorización con -ffast-math
+                cppFlags("-std=c++23", "-O3", "-fno-rtti", "-fno-exceptions", "-ffast-math")
+                arguments("-DANDROID_STL=c++_shared")
+                abiFilters("arm64-v8a", "x86_64")
             }
         }
     }
@@ -35,6 +46,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 
@@ -43,20 +57,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xcontext-receivers")
     }
 
     buildFeatures {
         compose = true
+        prefab = true // Requerido para la integración de Oboe vía AAR
     }
 
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = libs.versions.cmake.get()
         }
     }
 
@@ -68,19 +82,21 @@ android {
 }
 
 dependencies {
-    // Uso de strings directos para evitar errores de referencia en el catálogo TOML
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.activity:activity-compose:1.10.0")
-    implementation(platform("androidx.compose:compose-bom:2025.02.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
+    // AndroidX Core y Arquitectura
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
 
-    // Iconos Expandidos (Flechas pro)
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    // Jetpack Compose (Modern UI)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.material3)
 
+    // Oboe: Motor de audio C++ de baja latencia para Android
+    implementation("google.oboe:oboe:1.9.0")
+
+    // Entorno de Pruebas
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")

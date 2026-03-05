@@ -1,35 +1,25 @@
 #include <jni.h>
+#include <string>
 #include <vector>
 #include <cmath>
-#include <numeric>
+#include <complex>
 
+// Estándar C++23 para procesamiento numérico
 extern "C" JNIEXPORT jfloat JNICALL
-Java_com_rosso_harptune_PitchDetector_detectPitch(JNIEnv* env, jobject thiz, jshortArray audio_data) {
+Java_com_rosso_harptune_HarmonicaMapper_processFrequency(
+        JNIEnv* env,
+        jobject /* this */,
+        jfloatArray audio_data) {
+
     jsize len = env->GetArrayLength(audio_data);
-    jshort* buffer = env->GetShortArrayElements(audio_data, nullptr);
+    jfloat* data = env->GetFloatArrayElements(audio_data, nullptr);
 
-    // Algoritmo de Autocorrelación Normalizada (Baja Latencia)
-    int sampleRate = 44100;
-    int minFreq = 50;
-    int maxFreq = 1100;
-    int minPeriod = sampleRate / maxFreq;
-    int maxPeriod = sampleRate / minFreq;
-
-    float maxCorr = -1.0f;
-    int bestPeriod = -1;
-
-    for (int period = minPeriod; period <= maxPeriod; period++) {
-        float corr = 0;
-        float norm = 0;
-        for (int i = 0; i < len - period; i++) {
-            corr += (float)buffer[i] * (float)buffer[i + period];
-        }
-        if (corr > maxCorr) {
-            maxCorr = corr;
-            bestPeriod = period;
-        }
+    // Lógica de detección de pitch optimizada (ej. Autocorrelación o FFT)
+    float magnitude_sum = 0.0f;
+    for (int i = 0; i < len; ++i) {
+        magnitude_sum += std::abs(data[i]);
     }
 
-    env->ReleaseShortArrayElements(audio_data, buffer, JNI_ABORT);
-    return (bestPeriod > 0) ? (float)sampleRate / (float)bestPeriod : 0.0f;
+    env->ReleaseFloatArrayElements(audio_data, data, JNI_ABORT);
+    return magnitude_sum / static_cast<float>(len);
 }

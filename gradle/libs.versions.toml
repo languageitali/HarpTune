@@ -1,7 +1,30 @@
 [versions]
-# ... tus otras versiones
-androidx-material-icons-extended = "1.7.8" # Versión estable actual
+# Herramientas de compilación y NDK
+agp = "8.8.0"
+kotlin = "2.1.0"
+ndk = "27.0.12077973"
+cmake = "3.22.1"
+
+# Dependencias de AndroidX y Compose
+core-ktx = "1.15.0"
+lifecycle-runtime = "2.8.7"
+activity-compose = "1.10.0"
+compose-bom = "2025.02.00"
 
 [libraries]
-# ... tus otras librerías
-androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "androidx-material-icons-extended" }
+# Acceso vía libs.androidx.core.ktx
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+
+# UI Components (versionados vía BOM)
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+[plugins]
+# Acceso vía alias(libs.plugins.android.application)
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

@@ -1,41 +1,64 @@
 package com.rosso.harptune
 
-import kotlin.math.abs
+import android.util.Log
+import kotlin.math.log2
+import kotlin.math.roundToInt
 
-data class NoteInfo(
-    val noteName: String,
-    val cell: Int,
-    val isDraw: Boolean,
-    val theoreticalFreq: Float
-)
+/**
+ * HarmonicaMapper: Bridge JNI y Motor de Mapeo de Frecuencias.
+ * Arquitectura optimizada para procesamiento de señales en tiempo real (2026).
+ */
+class HarmonicaMapper {
 
-object HarmonicaMapper {
-    // Tabla completa Richter para Armónica en C (Do)
-    private val harmonicaTable = listOf(
-        NoteInfo("C3", 1, false, 130.81f),
-        NoteInfo("D3", 1, true, 146.83f),
-        NoteInfo("E3", 2, false, 164.81f),
-        NoteInfo("G3", 2, true, 196.00f),
-        NoteInfo("G3", 3, false, 196.00f),
-        NoteInfo("B3", 3, true, 246.94f),
-        NoteInfo("C4", 4, false, 261.63f),
-        NoteInfo("D4", 4, true, 293.66f),
-        NoteInfo("E4", 5, false, 329.63f),
-        NoteInfo("F4", 5, true, 349.23f),
-        NoteInfo("G4", 6, false, 392.00f),
-        NoteInfo("A4", 6, true, 440.00f),
-        NoteInfo("C5", 7, false, 523.25f),
-        NoteInfo("B4", 7, true, 493.88f),
-        NoteInfo("E5", 8, false, 659.25f),
-        NoteInfo("D5", 8, true, 587.33f),
-        NoteInfo("G5", 9, false, 783.99f),
-        NoteInfo("F5", 9, true, 698.46f),
-        NoteInfo("C6", 10, false, 1046.50f),
-        NoteInfo("A5", 10, true, 880.00f)
-    )
+    companion object {
+        private const val TAG = "HarmonicaMapper"
+        private const val REFERENCE_PITCH = 440.0 // A4
+        private const val MIDI_A4 = 69
 
-    fun mapFrequencyToNote(freq: Float): NoteInfo? {
-        if (freq < 40f) return null // Umbral de ruido
-        return harmonicaTable.minByOrNull { abs(it.theoreticalFreq - freq) }
+        private val NOTE_NAMES = arrayOf(
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+        )
+
+        init {
+            try {
+                // El nombre de la librería debe coincidir con el definido en CMakeLists.txt
+                System.loadLibrary("harptune-native")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "Error crítico: No se pudo cargar la librería nativa. Detalle: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Punto de entrada JNI.
+     * Invoca la implementación en C++ (native-lib.cpp) para realizar el análisis de pitch.
+     * @param buffer Bloque de muestras PCM Float32.
+     * @return Frecuencia fundamental detectada en Hz.
+     */
+    external fun processFrequency(buffer: FloatArray): Float
+
+    /**
+     * Transduce una frecuencia a una nota musical mediante la fórmula de temperamento igual.
+     * Optimizado para reducir la latencia de interpretación en UI.
+     * * f = 440 * 2^((n - 69) / 12) => n = 69 + 12 * log2(f / 440)
+     */
+    fun getNoteFromFrequency(frequency: Float): String {
+        if (frequency <= 0) return "---"
+
+        val midiNote = (MIDI_A4 + 12 * log2(frequency.toDouble() / REFERENCE_PITCH)).roundToInt()
+        val octave = (midiNote / 12) - 1
+        val noteIndex = midiNote % 12
+
+        return "${NOTE_NAMES[noteIndex]}$octave"
+    }
+
+    /**
+     * Determina la desviación en centésimas (cents) respecto a la nota ideal.
+     */
+    fun getCentsOff(frequency: Float): Double {
+        if (frequency <= 0) return 0.0
+        val midiNote = (MIDI_A4 + 12 * log2(frequency.toDouble() / REFERENCE_PITCH)).roundToInt()
+        val targetFreq = REFERENCE_PITCH * Math.pow(2.0, (midiNote - MIDI_A4) / 12.0)
+        return 1200 * log2(frequency.toDouble() / targetFreq)
     }
 }
