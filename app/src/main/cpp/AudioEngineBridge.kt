@@ -7,8 +7,13 @@ object AudioEngineBridge {
 
     external fun startEngine(): Boolean
     external fun stopEngine()
+
+    // Extracción de F0
     external fun getLatestFrequency(): Float
 
-    // Binding de la nueva función de extracción espectral
+    // Extracción de Centroide Espectral
     external fun getLatestBrightness(): Float
+
+    // Extracción del buffer circular (Tensor de Audio de 500ms)
+    external fun extractAudioTensor(): FloatArray
 }

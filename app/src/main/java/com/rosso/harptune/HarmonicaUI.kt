@@ -24,8 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.rosso.harptune.ml.TelemetryManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 @Composable
 fun HarmonicaScreen() {
@@ -59,24 +61,24 @@ fun HarmonicaScreen() {
 @Composable
 fun PitchDetectionComponent() {
     var detectedFrequency by remember { mutableStateOf(0.0) }
+    var detectedBrightness by remember { mutableStateOf(0.0f) }
     var harmonicaAction by remember { mutableStateOf<HarmonicaAction?>(null) }
     var lastValidAction by remember { mutableStateOf<HarmonicaAction?>(null) }
 
     var isRecording by remember { mutableStateOf(false) }
     val recordedActions = remember { mutableStateListOf<HarmonicaAction>() }
 
-    // Bucle de polling de baja latencia acoplado al NDK
     LaunchedEffect(Unit) {
         var lastRecordedAction: HarmonicaAction? = null
 
         while (isActive) {
-            // 1. Lectura atómica (Lock-free) desde la capa C++
             val freq = AudioEngineBridge.getLatestFrequency()
+            val brightness = AudioEngineBridge.getLatestBrightness()
 
-            // 2. Procesamiento de pitch válido
             if (freq > 70.0f) {
                 detectedFrequency = freq.toDouble()
-                val action = HarmonicaMapper.getHarmonicaAction(detectedFrequency)
+                detectedBrightness = brightness
+                val action = HarmonicaMapper.getHarmonicaAction(detectedFrequency, brightness)
 
                 if (action != null) {
                     harmonicaAction = action
@@ -88,10 +90,9 @@ fun PitchDetectionComponent() {
                     }
                 }
             } else {
-                harmonicaAction = null // Silencio o ruido espectral no periódico
+                harmonicaAction = null
             }
 
-            // Refresco a ~60 FPS (16ms)
             delay(16)
         }
     }
@@ -126,7 +127,16 @@ fun PitchDetectionComponent() {
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             val currentAction = lastValidAction
             if (currentAction != null) {
-                ActionDisplay(currentAction, isActive = harmonicaAction != null)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ActionDisplay(currentAction, isActive = harmonicaAction != null)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    ValidationOverlay(
+                        detectedAction = currentAction,
+                        f0 = detectedFrequency.toFloat(),
+                        brightness = detectedBrightness,
+                        onDismiss = {}
+                    )
+                }
             } else {
                 Text("Esperando sonido...", color = Color.Gray, fontSize = 20.sp)
             }
@@ -168,6 +178,88 @@ fun PitchDetectionComponent() {
             items(recordedActions) { action -> RecordedActionItem(action) }
         }
     }
+}
+
+@Composable
+fun ValidationOverlay(
+    detectedAction: HarmonicaAction,
+    f0: Float,
+    brightness: Float,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var showCorrectionDialog by remember { mutableStateOf(false) }
+
+    if (showCorrectionDialog) {
+        CorrectionDialog(
+            initialHole = detectedAction.hole,
+            onCorrect = { hole, isBlow ->
+                coroutineScope.launch {
+                    val tensor = AudioEngineBridge.extractAudioTensor()
+                    TelemetryManager.saveValidatedTensor(context, tensor, f0, brightness, hole, isBlow)
+                    showCorrectionDialog = false
+                    onDismiss()
+                }
+            },
+            onCancel = { showCorrectionDialog = false }
+        )
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = { showCorrectionDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) { Text("Corregir Fallo") }
+
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        val tensor = AudioEngineBridge.extractAudioTensor()
+                        TelemetryManager.saveValidatedTensor(
+                            context, tensor, f0, brightness, detectedAction.hole, detectedAction.isBlow
+                        )
+                        onDismiss()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+            ) { Text("Confirmar Bien") }
+        }
+    }
+}
+
+@Composable
+fun CorrectionDialog(initialHole: Int, onCorrect: (Int, Boolean) -> Unit, onCancel: () -> Unit) {
+    var selectedHole by remember { mutableStateOf(initialHole) }
+    var selectedBlow by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Corrección de Etiqueta") },
+        text = {
+            Column {
+                Slider(
+                    value = selectedHole.toFloat(),
+                    onValueChange = { selectedHole = it.toInt() },
+                    valueRange = 1f..10f,
+                    steps = 8
+                )
+                Text("Celda seleccionada: $selectedHole", fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = selectedBlow, onClick = { selectedBlow = true })
+                    Text("Soplar")
+                    Spacer(modifier = Modifier.width(16.dp))
+                    RadioButton(selected = !selectedBlow, onClick = { selectedBlow = false })
+                    Text("Aspirar")
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { onCorrect(selectedHole, selectedBlow) }) { Text("Guardar Muestra") } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } }
+    )
 }
 
 @Composable

@@ -65,8 +65,8 @@ dependencies {
     implementation(libs.androidx.material3)
 
     implementation("com.google.oboe:oboe:1.9.3")
-
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    
+    // TensorFlow Lite dependencies - Core and Task
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 }

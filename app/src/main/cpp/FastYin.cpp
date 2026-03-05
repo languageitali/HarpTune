@@ -3,15 +3,13 @@
 
 FastYin::FastYin(int32_t sampleRate, int32_t bufferSize)
         : mSampleRate(sampleRate), mBufferSize(bufferSize) {
-    // Asignación estática en inicialización (O(1) en runtime)
     mYinBuffer.assign(bufferSize / 2, 0.0f);
 }
 
-float FastYin::process(const float* audioBuffer, int32_t numFrames) {
+float FastYin::process(const float* audioBuffer, int32_t numFrames, float threshold) {
     int32_t yinBufferSize = mYinBuffer.size();
     if (numFrames < yinBufferSize * 2) return -1.0f;
 
-    // 1. Difference Function (Optimizada con aritmética de punteros y desenrollado de bucles)
     for (int32_t tau = 0; tau < yinBufferSize; tau++) {
         float sum = 0.0f;
         for (int32_t i = 0; i < yinBufferSize; i++) {
@@ -21,17 +19,14 @@ float FastYin::process(const float* audioBuffer, int32_t numFrames) {
         mYinBuffer[tau] = sum;
     }
 
-    // 2. Cumulative Mean Normalized Difference Function
     mYinBuffer[0] = 1.0f;
     float runningSum = 0.0f;
     int32_t bestTau = -1;
-    float threshold = 0.15f; // Umbral ajustado para armónica
 
     for (int32_t tau = 1; tau < yinBufferSize; tau++) {
         runningSum += mYinBuffer[tau];
         mYinBuffer[tau] *= tau / runningSum;
 
-        // 3. Absolute Thresholding
         if (mYinBuffer[tau] < threshold) {
             while (tau + 1 < yinBufferSize && mYinBuffer[tau + 1] < mYinBuffer[tau]) {
                 tau++;
@@ -43,7 +38,6 @@ float FastYin::process(const float* audioBuffer, int32_t numFrames) {
 
     if (bestTau == -1) return -1.0f;
 
-    // 4. Interpolación Parabólica para precisión sub-muestra
     float preciseTau = parabolicInterpolation(bestTau);
     return mSampleRate / preciseTau;
 }

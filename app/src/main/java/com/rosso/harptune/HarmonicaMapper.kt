@@ -6,18 +6,17 @@ import kotlin.math.log2
 data class HarmonicaAction(val hole: Int, val isBlow: Boolean, val noteName: String)
 
 object HarmonicaMapper {
-    
+
     init {
         System.loadLibrary("harptune-native")
     }
 
-    // Tabla Maestra según especificaciones técnicas
     private val masterTable = listOf(
         HarmonicaAction(1, true, "C4") to 261.63,
         HarmonicaAction(1, false, "D4") to 293.66,
         HarmonicaAction(2, true, "E4") to 329.63,
         HarmonicaAction(2, false, "G4") to 392.00,
-        HarmonicaAction(3, true, "G4") to 392.00, 
+        HarmonicaAction(3, true, "G4") to 392.00,
         HarmonicaAction(3, false, "B4") to 493.88,
         HarmonicaAction(4, true, "C5") to 523.25,
         HarmonicaAction(4, false, "D5") to 587.33,
@@ -35,14 +34,14 @@ object HarmonicaMapper {
         HarmonicaAction(10, false, "A6") to 1760.00
     )
 
-    private const val TOLERANCE_CENTS = 50.0
+    private const val TOLERANCE_CENTS = 45.0
 
     private fun centsDifference(f1: Double, f2: Double): Double {
         if (f1 <= 0 || f2 <= 0) return 1000.0
         return abs(1200.0 * log2(f2 / f1))
     }
 
-    fun getHarmonicaAction(capturedFreq: Double): HarmonicaAction? {
+    fun getHarmonicaAction(capturedFreq: Double, spectralBrightness: Float): HarmonicaAction? {
         if (capturedFreq <= 0) return null
 
         val freqToCompare = if (capturedFreq in 80.0..120.0) capturedFreq * 4.0 else capturedFreq
@@ -58,15 +57,22 @@ object HarmonicaMapper {
             }
         }
 
-        if (bestMatch?.noteName == "G4" && minCents <= TOLERANCE_CENTS) {
-            return HarmonicaAction(3, true, "G4")
+        if (minCents > TOLERANCE_CENTS) return null
+
+        if (bestMatch?.noteName == "G4") {
+            val thresholdAcoustic = 0.45f
+            return if (spectralBrightness > thresholdAcoustic) {
+                HarmonicaAction(2, false, "G4")
+            } else {
+                HarmonicaAction(3, true, "G4")
+            }
         }
 
-        return if (minCents <= TOLERANCE_CENTS) bestMatch else null
+        return bestMatch
     }
 
-    fun frequencyToNote(frequency: Double): String? {
-        val action = getHarmonicaAction(frequency)
+    fun frequencyToNote(frequency: Double, brightness: Float): String? {
+        val action = getHarmonicaAction(frequency, brightness)
         return action?.noteName
     }
 }
