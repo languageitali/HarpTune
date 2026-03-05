@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.rosso.harptune"
+    namespace = "com.rosso.harptune" // Espacio de nombres interno
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.rosso.detectfreq"
+        applicationId = "com.rosso.detectfreq" // ID de aplicación solicitado
         minSdk = 26
         targetSdk = 35
         versionCode = 5
@@ -21,6 +21,8 @@ android {
             cmake {
                 arguments("-DANDROID_STL=c++_shared")
                 abiFilters("arm64-v8a", "x86_64")
+                // Flags de optimización de vanguardia para procesamiento de señales
+                cppFlags("-std=gnu++20 -O3 -ffast-math -fno-rtti -fno-exceptions")
             }
         }
     }
@@ -44,7 +46,7 @@ android {
 
     buildFeatures {
         compose = true
-        prefab = true
+        prefab = true // Requerido para Oboe
     }
 
     externalNativeBuild {
@@ -64,9 +66,10 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
 
+    // Oboe (Compatible con Prefab)
     implementation("com.google.oboe:oboe:1.9.3")
-    
-    // TensorFlow Lite dependencies - Core and Task
+
+    // TensorFlow Lite - Core y Ops (No compatibles con Prefab, requieren enlace manual)
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 }

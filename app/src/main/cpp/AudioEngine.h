@@ -1,14 +1,14 @@
 #pragma once
 
 #include <oboe/Oboe.h>
+#include <tensorflow/lite/interpreter.h>
+#include <tensorflow/lite/kernels/register.h>
+#include <tensorflow/lite/model.h>
 #include <atomic>
 #include <vector>
 #include <memory>
 #include <mutex>
 #include "FastYin.h"
-#include <tensorflow/lite/interpreter.h>
-#include <tensorflow/lite/kernels/register.h>
-#include <tensorflow/lite/model.h>
 
 class AudioEngine : public oboe::AudioStreamDataCallback {
 public:

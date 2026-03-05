@@ -2,20 +2,25 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("harptune-native")
 
-# 1. Localizar dependencias mediante Prefab
-# Oboe usa su propio nombre de paquete
+# 1. Oboe via Prefab (Funciona correctamente)
 find_package(oboe REQUIRED CONFIG)
 
-# La dependencia de TensorFlow Lite queda estrictamente deshabilitada
-# hasta la fase de Inferencia en el Borde (Edge AI).
+# 2. Configuración manual de TensorFlow Lite
+# NOTA: Debes colocar los headers de TFLite en src/main/cpp/include
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# 2. Definición de la librería nativa
+# Definir la librería importada de TFLite
+add_library(lib_tflite SHARED IMPORTED)
+set_target_properties(lib_tflite PROPERTIES IMPORTED_LOCATION
+        ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libtensorflowlite.so)
+
+# 3. Definición de la librería del proyecto
 add_library(harptune-native SHARED
         native-lib.cpp
         AudioEngine.cpp
         FastYin.cpp)
 
-# 3. Configuración de estándares y optimizaciones (Estado del Arte)
+# 4. Estándares y Optimización de Baja Latencia
 target_compile_features(harptune-native PRIVATE cxx_std_20)
 
 target_compile_options(harptune-native PRIVATE
@@ -25,12 +30,12 @@ target_compile_options(harptune-native PRIVATE
         -fno-exceptions
         -Wall)
 
-# 4. Inclusión de librerías del sistema
+# 5. Enlace de targets
 find_library(log-lib log)
 find_library(android-lib android)
 
-# 5. Enlace de targets
 target_link_libraries(harptune-native
         oboe::oboe
+        lib_tflite # Enlace manual definido arriba
         ${log-lib}
         ${android-lib})
