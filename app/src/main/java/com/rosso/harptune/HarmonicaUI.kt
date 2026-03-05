@@ -2,9 +2,6 @@ package com.rosso.harptune
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,7 +13,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,14 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 @Composable
-fun HarmonicaScreen(pitchDetector: PitchDetector) {
+fun HarmonicaScreen() {
     val context = LocalContext.current
     var hasAudioPermission by remember {
         mutableStateOf(
@@ -57,88 +50,49 @@ fun HarmonicaScreen(pitchDetector: PitchDetector) {
     }
 
     if (hasAudioPermission) {
-        PitchDetectionComponent(pitchDetector)
+        PitchDetectionComponent()
     } else {
         PermissionDeniedView(onGrant = { launcher.launch(Manifest.permission.RECORD_AUDIO) })
     }
 }
 
 @Composable
-fun PitchDetectionComponent(pitchDetector: PitchDetector) {
+fun PitchDetectionComponent() {
     var detectedFrequency by remember { mutableStateOf(0.0) }
     var harmonicaAction by remember { mutableStateOf<HarmonicaAction?>(null) }
     var lastValidAction by remember { mutableStateOf<HarmonicaAction?>(null) }
-    
+
     var isRecording by remember { mutableStateOf(false) }
-    val recordedAudio = remember { mutableStateListOf<Short>() }
     val recordedActions = remember { mutableStateListOf<HarmonicaAction>() }
-    
-    val scope = rememberCoroutineScope()
-    val sampleRate = 44100
 
+    // Bucle de polling de baja latencia acoplado al NDK
     LaunchedEffect(Unit) {
-        val bufferSize = AudioRecord.getMinBufferSize(
-            sampleRate,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
-        ) * 2
+        var lastRecordedAction: HarmonicaAction? = null
 
-        val audioRecord = try {
-            AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
-            )
-        } catch (e: SecurityException) {
-            return@LaunchedEffect
-        }
+        while (isActive) {
+            // 1. Lectura atómica (Lock-free) desde la capa C++
+            val freq = AudioEngineBridge.getLatestFrequency()
 
-        val buffer = ShortArray(bufferSize)
-        audioRecord.startRecording()
+            // 2. Procesamiento de pitch válido
+            if (freq > 70.0f) {
+                detectedFrequency = freq.toDouble()
+                val action = HarmonicaMapper.getHarmonicaAction(detectedFrequency)
 
-        scope.launch(Dispatchers.Default) {
-            var lastRecordedAction: HarmonicaAction? = null
-            
-            while (isActive) {
-                val read = audioRecord.read(buffer, 0, bufferSize)
-                if (read > 0) {
-                    val currentBuffer = buffer.take(read).toShortArray()
-                    
-                    if (isRecording) {
-                        for (s in currentBuffer) recordedAudio.add(s)
-                    }
+                if (action != null) {
+                    harmonicaAction = action
+                    lastValidAction = action
 
-                    var sum = 0.0
-                    for (i in 0 until read) sum += abs(currentBuffer[i].toInt())
-                    val averageAmplitude = sum / read
-                    
-                    if (averageAmplitude > 450) { 
-                        // Uso de processAudio que es el método que existe en PitchDetector
-                        val freq = pitchDetector.processAudio(currentBuffer, sampleRate)
-                        if (freq > 70) {
-                            detectedFrequency = freq
-                            val action = HarmonicaMapper.getHarmonicaAction(freq)
-                            
-                            if (action != null) {
-                                harmonicaAction = action
-                                lastValidAction = action
-                                
-                                if (isRecording && (lastRecordedAction == null || action.hole != lastRecordedAction.hole || action.isBlow != lastRecordedAction.isBlow)) {
-                                    recordedActions.add(action)
-                                    lastRecordedAction = action
-                                }
-                            }
-                        }
-                    } else {
-                        harmonicaAction = null
+                    if (isRecording && (lastRecordedAction == null || action.hole != lastRecordedAction.hole || action.isBlow != lastRecordedAction.isBlow)) {
+                        recordedActions.add(action)
+                        lastRecordedAction = action
                     }
                 }
-                delay(20)
+            } else {
+                harmonicaAction = null // Silencio o ruido espectral no periódico
             }
-            audioRecord.stop()
-            audioRecord.release()
+
+            // Refresco a ~60 FPS (16ms)
+            delay(16)
         }
     }
 
@@ -150,7 +104,7 @@ fun PitchDetectionComponent(pitchDetector: PitchDetector) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Afinador de Armónica (C)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        
+
         Spacer(modifier = Modifier.height(8.dp))
 
         Card(
@@ -159,8 +113,8 @@ fun PitchDetectionComponent(pitchDetector: PitchDetector) {
         ) {
             Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = lastValidAction?.noteName ?: "---", 
-                    fontSize = 24.sp, 
+                    text = lastValidAction?.noteName ?: "---",
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(text = "%.2f Hz".format(detectedFrequency), style = MaterialTheme.typography.bodySmall)
@@ -177,12 +131,12 @@ fun PitchDetectionComponent(pitchDetector: PitchDetector) {
                 Text("Esperando sonido...", color = Color.Gray, fontSize = 20.sp)
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         HarmonicaGrid(
-            activeHole = lastValidAction?.hole, 
-            isBlow = lastValidAction?.isBlow ?: true, 
+            activeHole = lastValidAction?.hole,
+            isBlow = lastValidAction?.isBlow ?: true,
             isCurrentlyActive = harmonicaAction != null
         )
 
@@ -190,23 +144,15 @@ fun PitchDetectionComponent(pitchDetector: PitchDetector) {
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Button(
-                onClick = { if (!isRecording) { recordedAudio.clear(); recordedActions.clear() }; isRecording = !isRecording },
+                onClick = { if (!isRecording) { recordedActions.clear() }; isRecording = !isRecording },
                 modifier = Modifier.height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary)
-            ) { Text(if (isRecording) "DETENER" else "GRABAR") }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            IconButton(
-                onClick = { scope.launch(Dispatchers.IO) { AudioPlayer.playAudio(recordedAudio.toShortArray(), sampleRate) } },
-                enabled = !isRecording && recordedAudio.isNotEmpty(),
-                modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp))
-            ) { Icon(Icons.Default.PlayArrow, contentDescription = "Play") }
+            ) { Text(if (isRecording) "DETENER" else "GRABAR NOTAS") }
 
             Spacer(modifier = Modifier.width(16.dp))
 
             IconButton(
-                onClick = { recordedAudio.clear(); recordedActions.clear(); lastValidAction = null; detectedFrequency = 0.0 },
+                onClick = { recordedActions.clear(); lastValidAction = null; detectedFrequency = 0.0 },
                 modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
             ) { Icon(Icons.Default.Refresh, contentDescription = "Clear") }
         }

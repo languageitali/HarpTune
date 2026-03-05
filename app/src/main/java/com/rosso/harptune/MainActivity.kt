@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import com.rosso.harptune.ui.theme.DetectFreqTheme
 
 class MainActivity : ComponentActivity() {
-    private val pitchDetector = PitchDetector()
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -22,39 +21,28 @@ class MainActivity : ComponentActivity() {
         if (isGranted) {
             try {
                 AudioEngineBridge.startEngine()
-            } catch (e: UnsatisfiedLinkError) {
-                // Handle case where native lib is missing or method not implemented
-            }
+            } catch (e: UnsatisfiedLinkError) { }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         checkAudioPermissions()
-
         setContent {
             DetectFreqTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HarmonicaScreen(pitchDetector)
+                    HarmonicaScreen() // Se elimina pitchDetector
                 }
             }
         }
     }
 
     private fun checkAudioPermissions() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            try {
-                AudioEngineBridge.startEngine()
-            } catch (e: UnsatisfiedLinkError) {
-            }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            try { AudioEngineBridge.startEngine() } catch (e: UnsatisfiedLinkError) { }
         } else {
             requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -62,17 +50,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        try {
-            AudioEngineBridge.stopEngine()
-        } catch (e: UnsatisfiedLinkError) {
-        }
+        try { AudioEngineBridge.stopEngine() } catch (e: UnsatisfiedLinkError) { }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            AudioEngineBridge.stopEngine()
-        } catch (e: UnsatisfiedLinkError) {
-        }
+        try { AudioEngineBridge.stopEngine() } catch (e: UnsatisfiedLinkError) { }
     }
 }
