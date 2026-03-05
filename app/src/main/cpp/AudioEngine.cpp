@@ -1,8 +1,9 @@
 #include "AudioEngine.h"
 #include <android/log.h>
 #include <cmath>
+#include <algorithm>
 
-AudioEngine::AudioEngine() : mFastYin(48000, WINDOW_SIZE), mLatestFrequency(-1.0f) {
+AudioEngine::AudioEngine() : mFastYin(48000, 2048), mLatestFrequency(-1.0f) {
     mSampleBuffer.reserve(WINDOW_SIZE * 2);
 }
 
@@ -38,7 +39,10 @@ float AudioEngine::getLatestFrequency() {
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *floatData = static_cast<float *>(audioData);
 
-    mSampleBuffer.insert(mSampleBuffer.end(), floatData, floatData + numFrames);
+    // Evitar acumulaciones excesivas en el callback de audio
+    if (mSampleBuffer.size() < WINDOW_SIZE * 2) {
+        mSampleBuffer.insert(mSampleBuffer.end(), floatData, floatData + numFrames);
+    }
 
     if (mSampleBuffer.size() >= WINDOW_SIZE) {
         float rms = 0.0f;
@@ -54,7 +58,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStrea
             mLatestFrequency.store(-1.0f, std::memory_order_relaxed);
         }
 
-        mSampleBuffer.erase(mSampleBuffer.begin(), mSampleBuffer.begin() + numFrames);
+        // Remover solo lo procesado para mantener la ventana deslizante
+        int removeCount = std::min((int)mSampleBuffer.size(), numFrames);
+        mSampleBuffer.erase(mSampleBuffer.begin(), mSampleBuffer.begin() + removeCount);
     }
 
     return oboe::DataCallbackResult::Continue;

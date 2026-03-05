@@ -1,25 +1,31 @@
 #include <jni.h>
-#include <string>
-#include <vector>
-#include <cmath>
-#include <complex>
+#include <memory>
+#include "AudioEngine.h"
 
-// Estándar C++23 para procesamiento numérico
-extern "C" JNIEXPORT jfloat JNICALL
-Java_com_rosso_harptune_HarmonicaMapper_processFrequency(
-        JNIEnv* env,
-        jobject /* this */,
-        jfloatArray audio_data) {
+// Estándar de Producción: Puntero inteligente global para manejar el ciclo de vida del Engine
+static std::unique_ptr<AudioEngine> audio_engine = nullptr;
 
-    jsize len = env->GetArrayLength(audio_data);
-    jfloat* data = env->GetFloatArrayElements(audio_data, nullptr);
-
-    // Lógica de detección de pitch optimizada (ej. Autocorrelación o FFT)
-    float magnitude_sum = 0.0f;
-    for (int i = 0; i < len; ++i) {
-        magnitude_sum += std::abs(data[i]);
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_rosso_harptune_AudioEngineBridge_startEngine(JNIEnv *env, jobject thiz) {
+    if (!audio_engine) {
+        audio_engine = std::make_unique<AudioEngine>();
     }
+    return audio_engine->start() ? JNI_TRUE : JNI_FALSE;
+}
 
-    env->ReleaseFloatArrayElements(audio_data, data, JNI_ABORT);
-    return magnitude_sum / static_cast<float>(len);
+extern "C" JNIEXPORT void JNICALL
+Java_com_rosso_harptune_AudioEngineBridge_stopEngine(JNIEnv *env, jobject thiz) {
+    if (audio_engine) {
+        audio_engine->stop();
+        // Liberar memoria cuando la app pasa a background o se destruye
+        audio_engine.reset();
+    }
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_rosso_harptune_AudioEngineBridge_getLatestFrequency(JNIEnv *env, jobject thiz) {
+    if (audio_engine) {
+        return audio_engine->getLatestFrequency();
+    }
+    return -1.0f; // Retorna -1 si el motor no está inicializado
 }

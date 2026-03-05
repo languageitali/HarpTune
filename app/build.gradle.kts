@@ -9,7 +9,6 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Application ID configurado para la aplicación de frecuencia
         applicationId = "com.rosso.detectfreq"
         minSdk = 26
         targetSdk = 35
@@ -20,7 +19,6 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags("-std=c++23", "-O3", "-fno-rtti", "-fno-exceptions", "-ffast-math")
                 arguments("-DANDROID_STL=c++_shared")
                 abiFilters("arm64-v8a", "x86_64")
             }
@@ -32,9 +30,6 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            ndk {
-                debugSymbolLevel = "FULL"
-            }
         }
     }
 
@@ -45,24 +40,17 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xcontext-receivers")
     }
 
     buildFeatures {
         compose = true
-        prefab = true // Crucial para la integración de Oboe
+        prefab = true
     }
 
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = libs.versions.cmake.get()
-        }
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            version = "3.22.1"
         }
     }
 }
@@ -76,7 +64,6 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
 
-    // CORRECCIÓN: Group ID correcto para Oboe
     implementation("com.google.oboe:oboe:1.9.3")
 
     testImplementation("junit:junit:4.13.2")
