@@ -29,3 +29,12 @@ Java_com_rosso_harptune_AudioEngineBridge_getLatestFrequency(JNIEnv *env, jobjec
     }
     return -1.0f; // Retorna -1 si el motor no está inicializado
 }
+
+// Nueva exportación JNI para el análisis de timbre
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_rosso_harptune_AudioEngineBridge_getLatestBrightness(JNIEnv *env, jobject thiz) {
+    if (audio_engine) {
+        return audio_engine->getLatestBrightness();
+    }
+    return 0.0f;
+}
