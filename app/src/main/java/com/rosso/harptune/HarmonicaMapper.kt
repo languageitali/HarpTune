@@ -7,6 +7,10 @@ data class HarmonicaAction(val hole: Int, val isBlow: Boolean, val noteName: Str
 
 object HarmonicaMapper {
     
+    init {
+        System.loadLibrary("harptune-native")
+    }
+
     // Tabla Maestra según especificaciones técnicas
     private val masterTable = listOf(
         HarmonicaAction(1, true, "C4") to 261.63,
@@ -41,7 +45,6 @@ object HarmonicaMapper {
     fun getHarmonicaAction(capturedFreq: Double): HarmonicaAction? {
         if (capturedFreq <= 0) return null
 
-        // Compensación para voz grave del usuario
         val freqToCompare = if (capturedFreq in 80.0..120.0) capturedFreq * 4.0 else capturedFreq
 
         var bestMatch: HarmonicaAction? = null

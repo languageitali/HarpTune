@@ -1,7 +1,10 @@
 #include "AudioEngine.h"
 #include <android/log.h>
+#include <cmath>
 
-AudioEngine::AudioEngine() : mFastYin(48000, 2048), mLatestFrequency(-1.0f) {}
+AudioEngine::AudioEngine() : mFastYin(48000, WINDOW_SIZE), mLatestFrequency(-1.0f) {
+    mSampleBuffer.reserve(WINDOW_SIZE * 2);
+}
 
 bool AudioEngine::start() {
     oboe::AudioStreamBuilder builder;
@@ -10,7 +13,7 @@ bool AudioEngine::start() {
             ->setSharingMode(oboe::SharingMode::Exclusive)
             ->setFormat(oboe::AudioFormat::Float)
             ->setChannelCount(oboe::ChannelCount::Mono)
-            ->setSampleRate(48000) // Estándar de hardware para baja latencia
+            ->setSampleRate(48000)
             ->setDataCallback(this);
 
     oboe::Result result = builder.openStream(mStream);
@@ -35,16 +38,23 @@ float AudioEngine::getLatestFrequency() {
 oboe::DataCallbackResult AudioEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *floatData = static_cast<float *>(audioData);
 
-    // Calcular energía RMS para descartar silencio absoluto
-    float rms = 0.0f;
-    for (int i = 0; i < numFrames; i++) rms += floatData[i] * floatData[i];
-    rms = sqrt(rms / numFrames);
+    mSampleBuffer.insert(mSampleBuffer.end(), floatData, floatData + numFrames);
 
-    if (rms > 0.01f) {
-        float freq = mFastYin.process(floatData, numFrames);
-        mLatestFrequency.store(freq, std::memory_order_relaxed);
-    } else {
-        mLatestFrequency.store(-1.0f, std::memory_order_relaxed);
+    if (mSampleBuffer.size() >= WINDOW_SIZE) {
+        float rms = 0.0f;
+        for (int i = 0; i < WINDOW_SIZE; i++) {
+            rms += mSampleBuffer[i] * mSampleBuffer[i];
+        }
+        rms = std::sqrt(rms / WINDOW_SIZE);
+
+        if (rms > 0.01f) {
+            float freq = mFastYin.process(mSampleBuffer.data(), WINDOW_SIZE);
+            mLatestFrequency.store(freq, std::memory_order_relaxed);
+        } else {
+            mLatestFrequency.store(-1.0f, std::memory_order_relaxed);
+        }
+
+        mSampleBuffer.erase(mSampleBuffer.begin(), mSampleBuffer.begin() + numFrames);
     }
 
     return oboe::DataCallbackResult::Continue;

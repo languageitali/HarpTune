@@ -1,7 +1,9 @@
 #pragma once
 #include <oboe/Oboe.h>
-#include "FastYin.h"
 #include <atomic>
+#include <vector>
+#include <memory>
+#include "FastYin.h"
 
 class AudioEngine : public oboe::AudioStreamDataCallback {
 public:
@@ -15,4 +17,7 @@ private:
     std::shared_ptr<oboe::AudioStream> mStream;
     FastYin mFastYin;
     std::atomic<float> mLatestFrequency;
+
+    std::vector<float> mSampleBuffer;
+    const int WINDOW_SIZE = 2048;
 };
