@@ -1,12 +1,6 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -19,6 +13,6 @@ dependencyResolutionManagement {
     }
 }
 
-include(":harptune-core") // En lugar de :detectfreq
+rootProject.name = "harptune"
 include(":app")
- 
+// include(":harptune-core") // Habilitar solo si el módulo existe físicamente
